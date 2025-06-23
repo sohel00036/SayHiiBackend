@@ -22,7 +22,7 @@ app.use(express.json({ limit: "10mb" })); // Increase JSON payload limit
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:5174",
+    origin: "https://sayhiifrontend.onrender.com",
     credentials: true,
   })
 );
