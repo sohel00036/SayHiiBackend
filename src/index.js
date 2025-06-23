@@ -26,7 +26,9 @@ app.use(
     credentials: true,
   })
 );
-
+app.get("/test", (req, res) => {
+  res.send({ message: "Backend is working!" });
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 

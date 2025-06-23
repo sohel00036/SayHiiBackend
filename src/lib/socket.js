@@ -9,7 +9,7 @@ const io = new Server(server, {
   cors: {
     origin: ["https://sayhiifrontend.onrender.com"],
   },
-});
+}); 
 
 export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
