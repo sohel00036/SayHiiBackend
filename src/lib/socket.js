@@ -7,9 +7,9 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["https://sayhiifrontend.onrender.com"],
+    origin: ["http://localhost:5174"],
   },
-}); 
+});
 
 export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
@@ -17,6 +17,10 @@ export function getReceiverSocketId(userId) {
 
 // used to store online users
 const userSocketMap = {}; // {userId: socketId}
+
+
+// this things is going to tell the user about the other logged in users and the green dot 
+// on the profile is going to show by the frontend using this funciton oly 
 
 io.on("connection", (socket) => {
   console.log("A user connected", socket.id);

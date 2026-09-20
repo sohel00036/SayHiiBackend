@@ -9,6 +9,7 @@ import { connectDB } from "./lib/db.js";
 
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
+import aiRoutes from "./routes/ai.routes.js";
 import { app, server } from "./lib/socket.js";
 
 dotenv.config();
@@ -22,23 +23,22 @@ app.use(express.json({ limit: "10mb" })); // Increase JSON payload limit
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "https://sayhiifrontend.onrender.com",
+    origin: "http://localhost:5174",
     credentials: true,
   })
 );
-app.get("/test", (req, res) => {
-  res.send({ message: "Backend is working!" });
-});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/ai", aiRoutes);
 
-// if (process.env.NODE_ENV === "production") {
-//   app.use(express.static(path.join(__dirname, "../frontend/dist")));
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
-//   app.get("*", (req, res) => {
-//     res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-//   });
-// }
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  });
+}
 
 server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);

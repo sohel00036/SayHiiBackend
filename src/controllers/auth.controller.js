@@ -28,7 +28,7 @@ export const signup = async (req, res) => {
     });
 
     if (newUser) {
-      // generate jwt token here
+      // generate jwt token here aasaan hai don't worry 
       generateToken(newUser._id, res);
       await newUser.save();
 

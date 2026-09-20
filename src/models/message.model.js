@@ -18,6 +18,11 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    embedding: {
+      type: [Number],
+      default: undefined,
+      select: false,
+    },
   },
   { timestamps: true }
 );

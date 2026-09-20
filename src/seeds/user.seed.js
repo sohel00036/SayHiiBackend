@@ -1,6 +1,7 @@
 import { config } from "dotenv";
 import { connectDB } from "../lib/db.js";
 import User from "../models/user.model.js";
+import { BOT_USER_ID } from "../lib/constants.js";
 
 config();
 
@@ -100,14 +101,36 @@ const seedUsers = [
   },
 ];
 
+const botUser = {
+  _id: BOT_USER_ID,
+  email: "sayhii.ai@bot.com",
+  fullName: "SayHii AI",
+  password: "sayhii_bot_secure_password_123",
+  profilePic: "https://api.dicebear.com/7.x/bottts/svg?seed=SayHiiAI",
+  isBot: true,
+};
+
 const seedDatabase = async () => {
   try {
     await connectDB();
 
-    await User.insertMany(seedUsers);
+    // Upsert bot user so running seed multiple times doesn't fail
+    await User.findOneAndUpdate(
+      { _id: BOT_USER_ID },
+      botUser,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    console.log("Bot user seeded successfully");
+
+    // Insert other sample users if needed
+    for (const u of seedUsers) {
+      await User.findOneAndUpdate({ email: u.email }, u, { upsert: true });
+    }
     console.log("Database seeded successfully");
+    process.exit(0);
   } catch (error) {
     console.error("Error seeding database:", error);
+    process.exit(1);
   }
 };
 
