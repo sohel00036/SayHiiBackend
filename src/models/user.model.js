@@ -24,6 +24,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    aiQueryCount: {
+      type: Number,
+      default: 0,
+    },
+    lastAiQueryDate: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Message from "../models/message.model.js";
 import { generateEmbedding, generateRAGAnswer } from "../lib/ai.service.js";
+import { checkAndIncrementAiQuota } from "../middleware/aiQuota.middleware.js";
 
 /**
  * Controller to answer natural-language questions about user's past chats using Vector RAG Search.
@@ -12,6 +13,12 @@ export const askAIAboutChats = async (req, res) => {
 
     if (!query || typeof query !== "string" || !query.trim()) {
       return res.status(400).json({ message: "Search query is required." });
+    }
+
+    // Check AI daily quota
+    const quotaCheck = await checkAndIncrementAiQuota(userId);
+    if (!quotaCheck.allowed) {
+      return res.status(429).json({ message: quotaCheck.message });
     }
 
     // 1. Generate query embedding (768 dimensions)

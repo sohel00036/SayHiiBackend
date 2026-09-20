@@ -160,6 +160,25 @@ async function handleBotReply(userObjectId, userText) {
   const tempMessageId = `temp-ai-${Date.now()}`;
 
   try {
+    // Check AI daily quota for SayHii Bot chat
+    const quotaCheck = await checkAndIncrementAiQuota(userObjectId);
+    if (!quotaCheck.allowed) {
+      const limitText = `⚠️ ${quotaCheck.message}`;
+      const limitMessage = new Message({
+        senderId: BOT_USER_ID,
+        receiverId: userObjectId,
+        text: limitText,
+      });
+      await limitMessage.save();
+
+      if (userSocketId) {
+        io.to(userSocketId).emit("aiMessageDone", {
+          tempMessageId,
+          message: limitMessage,
+        });
+      }
+      return;
+    }
     // 1. Fetch last 10 messages between user and bot for context
     const recentMessages = await Message.find({
       $or: [
