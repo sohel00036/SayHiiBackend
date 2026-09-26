@@ -6,6 +6,7 @@ import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import { BOT_USER_ID } from "../lib/constants.js";
 import { generateAIReplyStream, generateEmbedding } from "../lib/ai.service.js";
+import { checkAndIncrementAiQuota } from "../middleware/aiQuota.middleware.js";
 
 export const getUsersForSidebar = async (req, res) => {
   try {

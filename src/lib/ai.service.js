@@ -1,11 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
+import mongoose from "mongoose";
+import Message from "../models/message.model.js";
 
 /**
  * Dedicated AI Service Module for SayHii.
  * Handles interaction with Google Gemini API.
  * Phase 1: Direct Gemini reply & token streaming.
  * Phase 2: Gemini Embeddings (gemini-embedding-001, 768 dim) & RAG search answer generation.
- * Phase 3: Can be extended with summarization and action item extraction.
+ * Phase 3: Shared retrieval helper for agent tools.
  */
 
 const BOT_SYSTEM_INSTRUCTION = `You are SayHii AI, a friendly, helpful, and concise AI assistant embedded inside the SayHii real-time messaging application. 
@@ -164,4 +166,164 @@ User Question: ${query}`;
     console.error("Error in generateRAGAnswer:", error.message);
     throw error;
   }
+}
+
+/**
+ * Shared retrieval helper: performs vector search with fallback to recent messages.
+ * Reused by both the Phase 2 RAG search endpoint and Phase 3 agent tools.
+ * @param {string} userId - The authenticated user's ObjectId string
+ * @param {string} query - Natural-language query to embed and search
+ * @param {object} options - Optional overrides
+ * @param {number} options.vectorLimit - Number of vector search results (default 8)
+ * @param {number} options.fallbackLimit - Number of fallback recent messages (default 15)
+ * @param {string} options.contactId - If provided, restrict search to conversation with this user
+ * @returns {Promise<Array>} Matching messages with sender/receiver populated
+ */
+export async function retrieveRelevantMessages(userId, query, options = {}) {
+  const { vectorLimit = 8, fallbackLimit = 15, contactId = null } = options;
+
+  const queryVector = await generateEmbedding(query);
+  let matchingMessages = [];
+
+  // Build filter scoped to this user's conversations
+  const userObjId = new mongoose.Types.ObjectId(userId);
+
+  if (queryVector && queryVector.length > 0) {
+    try {
+      const vectorFilter = contactId
+        ? {
+            $and: [
+              {
+                $or: [
+                  { senderId: userObjId, receiverId: new mongoose.Types.ObjectId(contactId) },
+                  { senderId: new mongoose.Types.ObjectId(contactId), receiverId: userObjId },
+                ],
+              },
+            ],
+          }
+        : {
+            $or: [
+              { senderId: userObjId },
+              { receiverId: userObjId },
+            ],
+          };
+
+      const pipeline = [
+        {
+          $vectorSearch: {
+            index: "vector_index",
+            path: "embedding",
+            queryVector,
+            numCandidates: 100,
+            limit: vectorLimit,
+            filter: vectorFilter,
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "senderId",
+            foreignField: "_id",
+            as: "sender",
+          },
+        },
+        { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "receiverId",
+            foreignField: "_id",
+            as: "receiver",
+          },
+        },
+        { $unwind: { path: "$receiver", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 1,
+            text: 1,
+            senderId: 1,
+            receiverId: 1,
+            createdAt: 1,
+            "sender.fullName": 1,
+            "sender.profilePic": 1,
+            "receiver.fullName": 1,
+          },
+        },
+      ];
+
+      matchingMessages = await Message.aggregate(pipeline);
+    } catch (vectorSearchError) {
+      console.warn("Atlas vector search notice (index might be building):", vectorSearchError.message);
+    }
+  }
+
+  // Fallback: recent messages if vector search returned nothing
+  if (!matchingMessages || matchingMessages.length === 0) {
+    const fallbackMatch = contactId
+      ? {
+          $or: [
+            { senderId: userObjId, receiverId: new mongoose.Types.ObjectId(contactId) },
+            { senderId: new mongoose.Types.ObjectId(contactId), receiverId: userObjId },
+          ],
+          text: { $exists: true, $ne: "" },
+        }
+      : {
+          $or: [{ senderId: userObjId }, { receiverId: userObjId }],
+          text: { $exists: true, $ne: "" },
+        };
+
+    matchingMessages = await Message.aggregate([
+      { $match: fallbackMatch },
+      { $sort: { createdAt: -1 } },
+      { $limit: fallbackLimit },
+      {
+        $lookup: {
+          from: "users",
+          localField: "senderId",
+          foreignField: "_id",
+          as: "sender",
+        },
+      },
+      { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "receiverId",
+          foreignField: "_id",
+          as: "receiver",
+        },
+      },
+      { $unwind: { path: "$receiver", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          text: 1,
+          senderId: 1,
+          receiverId: 1,
+          createdAt: 1,
+          "sender.fullName": 1,
+          "sender.profilePic": 1,
+          "receiver.fullName": 1,
+        },
+      },
+    ]);
+  }
+
+  return matchingMessages;
+}
+
+/**
+ * Formats retrieved messages into a human-readable context string for LLM prompts.
+ * @param {Array} messages - Messages with populated sender/receiver
+ * @returns {string} Formatted context
+ */
+export function formatMessagesAsContext(messages = []) {
+  return messages
+    .map((msg, idx) => {
+      const sender = msg.sender?.fullName || "User";
+      const receiver = msg.receiver?.fullName || "User";
+      const dateStr = msg.createdAt ? new Date(msg.createdAt).toLocaleString() : "Unknown date";
+      return `[Message ${idx + 1}] (${dateStr}) ${sender} to ${receiver}: "${msg.text}"`;
+    })
+    .join("\n");
 }
