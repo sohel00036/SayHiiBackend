@@ -179,7 +179,22 @@ User Question: ${query}`;
  * @param {string} options.contactId - If provided, restrict search to conversation with this user
  * @returns {Promise<Array>} Matching messages with sender/receiver populated
  */
-export async function retrieveRelevantMessages(userId, query, options = {}) {
+export async function retrieveRelevantMessages(arg1, arg2, arg3 = {}) {
+  let userId, query, options;
+  if (typeof arg1 === "object" && arg1 !== null && arg1.userId) {
+    userId = arg1.userId;
+    query = arg1.query;
+    options = {
+      vectorLimit: arg1.limit || arg1.vectorLimit || 8,
+      fallbackLimit: arg1.fallbackLimit || arg1.limit || 15,
+      contactId: arg1.contactId || null,
+    };
+  } else {
+    userId = arg1;
+    query = arg2;
+    options = arg3;
+  }
+
   const { vectorLimit = 8, fallbackLimit = 15, contactId = null } = options;
 
   const queryVector = await generateEmbedding(query);

@@ -55,7 +55,8 @@ export const askAIAboutChats = async (req, res) => {
  */
 export const agentChat = async (req, res) => {
   try {
-    const { query } = req.body;
+    const query = req.body.query || req.body.instruction;
+    const { targetUserId } = req.body;
     const userId = req.user._id;
     const userName = req.user.fullName;
 
@@ -70,7 +71,7 @@ export const agentChat = async (req, res) => {
     }
 
     // Run the agent — it will decide which tool(s) to call
-    const agentResult = await runAgent(userId.toString(), userName, query.trim());
+    const agentResult = await runAgent(userId.toString(), userName, query.trim(), targetUserId);
 
     return res.status(200).json(agentResult);
   } catch (error) {
@@ -106,7 +107,8 @@ export const toggleTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found." });
     }
 
-    task.isCompleted = !task.isCompleted;
+    task.completed = !task.completed;
+    task.isCompleted = task.completed;
     await task.save();
 
     return res.status(200).json(task);

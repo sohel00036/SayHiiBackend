@@ -52,18 +52,19 @@ async function resolveContactId(contactName) {
 
 /**
  * Creates the 3 tools scoped to a specific user context.
- * Each tool receives userId and userName via closure so the agent doesn't need to know them.
+ * Each tool receives userId, userName, and defaultTargetUserId via closure.
  */
-function createTools(userId, userName) {
+function createTools(userId, userName, defaultTargetUserId = null) {
   // -------------------------------------------------------------------
   // Tool 1: Summarize Conversation
   // -------------------------------------------------------------------
   const summarizeConversation = tool(
     async ({ contactName, timeframeDays, customFocus }) => {
       try {
-        let contactObjId = null;
+        let contactObjId = defaultTargetUserId;
         if (contactName) {
-          contactObjId = await resolveContactId(contactName);
+          const resolved = await resolveContactId(contactName);
+          if (resolved) contactObjId = resolved;
         }
 
         const messages = await retrieveRelevantMessages({
@@ -119,9 +120,10 @@ Format using markdown with emoji headers.`;
   const extractActionItems = tool(
     async ({ contactName }) => {
       try {
-        let contactObjId = null;
+        let contactObjId = defaultTargetUserId;
         if (contactName) {
-          contactObjId = await resolveContactId(contactName);
+          const resolved = await resolveContactId(contactName);
+          if (resolved) contactObjId = resolved;
         }
 
         const messages = await retrieveRelevantMessages({
@@ -168,13 +170,14 @@ If no clear tasks exist, return an empty array [].`;
         if (Array.isArray(extractedTasks) && extractedTasks.length > 0) {
           for (const item of extractedTasks) {
             if (!item.title) continue;
+            const priorityVal = (item.priority || "medium").toLowerCase();
             const newTask = new Task({
-              user: new mongoose.Types.ObjectId(userId),
+              userId: new mongoose.Types.ObjectId(userId),
               title: item.title,
               description: item.description || "",
-              dueDate: item.dueDate || null,
+              dueDate: item.dueDate ? String(item.dueDate) : null,
               assignee: item.assignee || null,
-              priority: ["high", "medium", "low"].includes(item.priority) ? item.priority : "medium",
+              priority: ["high", "medium", "low"].includes(priorityVal) ? priorityVal : "medium",
               sourceConversation: item.sourceConversation || contactName || "Chat History",
             });
             await newTask.save();
@@ -212,9 +215,10 @@ If no clear tasks exist, return an empty array [].`;
   const draftReply = tool(
     async ({ contactName, topic, context }) => {
       try {
-        let contactObjId = null;
+        let contactObjId = defaultTargetUserId;
         if (contactName) {
-          contactObjId = await resolveContactId(contactName);
+          const resolved = await resolveContactId(contactName);
+          if (resolved) contactObjId = resolved;
         }
 
         const recentMessages = await retrieveRelevantMessages({
@@ -283,11 +287,12 @@ OUTPUT ONLY THE DRAFT TEXT so it can be inserted directly into the user's chat m
  * @param {string} userId - Authenticated user's ObjectId string
  * @param {string} userName - Authenticated user's display name
  * @param {string} query - User's natural-language request
+ * @param {string|null} targetUserId - Active chat target user ObjectId if available
  * @returns {Promise<object>} Agent result with action, toolUsed, and response
  */
-export async function runAgent(userId, userName, query) {
+export async function runAgent(userId, userName, query, targetUserId = null) {
   const model = getModel();
-  const tools = createTools(userId, userName);
+  const tools = createTools(userId, userName, targetUserId);
   const toolsByName = Object.fromEntries(tools.map((t) => [t.name, t]));
 
   const modelWithTools = model.bindTools(tools);

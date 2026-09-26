@@ -11,6 +11,7 @@ import { connectDB } from "./lib/db.js";
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import aiRoutes from "./routes/ai.routes.js";
+import groupRoutes from "./routes/group.routes.js";
 import { app, server } from "./lib/socket.js";
 
 dotenv.config();
@@ -50,6 +51,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/groups", groupRoutes);
 
 const frontendDistPath = path.join(__dirname, "../frontend/dist");
 if (process.env.NODE_ENV === "production" && fs.existsSync(frontendDistPath)) {
